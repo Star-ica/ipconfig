@@ -1,0 +1,1752 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>IPConfig — Onchain IP Registry</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet"/>
+<style>
+/* ── Design tokens ──────────────────────────────────────────────── */
+:root {
+  --ink:        #0e1117;
+  --ink-mid:    #3d4451;
+  --ink-soft:   #6b7280;
+  --rule:       #e4e7ec;
+  --surface:    #f8f9fb;
+  --white:      #ffffff;
+  --accent:     #1a56db;        /* deep registry blue */
+  --accent-lt:  #eff4ff;
+  --accent-dk:  #1240a8;
+  --gold:       #b45309;        /* certification amber */
+  --gold-lt:    #fef3c7;
+  --ok:         #15803d;
+  --ok-lt:      #dcfce7;
+  --warn:       #b45309;
+  --warn-lt:    #fef3c7;
+  --danger:     #b91c1c;
+  --danger-lt:  #fee2e2;
+  --radius:     6px;
+  --shadow:     0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.04);
+  --shadow-md:  0 4px 12px rgba(0,0,0,.10);
+}
+
+/* ── Reset & base ───────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--surface);
+  min-height: 100vh;
+}
+h1, h2, h3, h4 { font-family: 'DM Serif Display', serif; font-weight: 400; line-height: 1.2; }
+a { color: var(--accent); text-decoration: none; }
+input, select, textarea {
+  font-family: inherit; font-size: 14px; color: var(--ink);
+  background: var(--white); border: 1px solid var(--rule);
+  border-radius: var(--radius); padding: 9px 12px; width: 100%;
+  outline: none; transition: border-color .15s;
+}
+input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+textarea { resize: vertical; min-height: 80px; }
+button { cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 500; border: none; border-radius: var(--radius); padding: 9px 18px; transition: background .15s, transform .1s; }
+button:active { transform: scale(.98); }
+
+/* ── Layout ─────────────────────────────────────────────────────── */
+#app { display: flex; flex-direction: column; min-height: 100vh; }
+
+/* ── Top bar ────────────────────────────────────────────────────── */
+#topbar {
+  background: var(--white); border-bottom: 1px solid var(--rule);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 28px; height: 56px; position: sticky; top: 0; z-index: 100;
+}
+.logo {
+  font-family: 'DM Serif Display', serif; font-size: 20px;
+  color: var(--ink); display: flex; align-items: center; gap: 8px;
+}
+.logo span.dot { color: var(--accent); }
+.logo-badge {
+  font-family: 'Inter', sans-serif; font-size: 10px; font-weight: 600;
+  letter-spacing: .06em; color: var(--accent); background: var(--accent-lt);
+  padding: 2px 6px; border-radius: 4px; margin-left: 2px;
+}
+.topnav { display: flex; gap: 4px; }
+.topnav button {
+  background: none; color: var(--ink-mid); padding: 7px 12px;
+  border-radius: var(--radius); font-size: 13px;
+}
+.topnav button:hover, .topnav button.active {
+  background: var(--accent-lt); color: var(--accent);
+}
+#wallet-btn {
+  background: var(--accent); color: var(--white);
+  padding: 8px 16px; font-size: 13px; border-radius: var(--radius);
+}
+#wallet-btn:hover { background: var(--accent-dk); }
+#wallet-btn.connected { background: var(--ok-lt); color: var(--ok); }
+
+/* ── Pages ──────────────────────────────────────────────────────── */
+.page { display: none; padding: 32px 28px; max-width: 1180px; margin: 0 auto; width: 100%; }
+.page.active { display: block; }
+
+/* ── Landing ────────────────────────────────────────────────────── */
+#page-landing {
+  display: none; max-width: 100%; padding: 0;
+}
+#page-landing.active { display: block; }
+
+.hero {
+  background: var(--ink);
+  padding: 72px 28px 64px;
+  text-align: center;
+  position: relative; overflow: hidden;
+}
+.hero::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: repeating-linear-gradient(
+    90deg, transparent, transparent 60px,
+    rgba(255,255,255,.025) 60px, rgba(255,255,255,.025) 61px
+  ),
+  repeating-linear-gradient(
+    0deg, transparent, transparent 60px,
+    rgba(255,255,255,.025) 60px, rgba(255,255,255,.025) 61px
+  );
+}
+.hero-inner { position: relative; max-width: 720px; margin: 0 auto; }
+.hero h1 {
+  font-size: clamp(36px, 5vw, 60px);
+  color: var(--white); line-height: 1.1; margin-bottom: 20px;
+}
+.hero h1 em { color: #93c5fd; font-style: normal; }
+.hero p {
+  color: rgba(255,255,255,.65); font-size: 16px;
+  line-height: 1.65; max-width: 560px; margin: 0 auto 36px;
+}
+.hero-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.btn-primary { background: var(--accent); color: var(--white); padding: 12px 24px; font-size: 14px; }
+.btn-primary:hover { background: var(--accent-dk); }
+.btn-ghost { background: rgba(255,255,255,.12); color: var(--white); padding: 12px 24px; font-size: 14px; }
+.btn-ghost:hover { background: rgba(255,255,255,.2); }
+
+.disclaimer-banner {
+  background: var(--gold-lt); border-top: 3px solid var(--gold);
+  padding: 16px 28px; display: flex; gap: 12px; align-items: flex-start;
+}
+.disclaimer-banner .icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+.disclaimer-banner p { color: var(--gold); font-size: 13px; line-height: 1.55; }
+.disclaimer-banner strong { font-weight: 600; }
+
+.features-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1px; background: var(--rule); border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+.feature-item {
+  background: var(--white); padding: 32px 28px;
+}
+.feature-item h3 { font-size: 17px; margin-bottom: 10px; }
+.feature-item p { color: var(--ink-soft); font-size: 13px; line-height: 1.6; }
+.feature-icon { font-size: 28px; margin-bottom: 14px; }
+
+.stats-row {
+  background: var(--white); padding: 32px 28px;
+  display: flex; justify-content: center; gap: 60px; flex-wrap: wrap;
+  border-bottom: 1px solid var(--rule);
+}
+.stat-item { text-align: center; }
+.stat-item .num {
+  font-family: 'DM Serif Display', serif; font-size: 36px; color: var(--accent);
+  display: block;
+}
+.stat-item .label { font-size: 12px; color: var(--ink-soft); font-weight: 500; letter-spacing: .04em; }
+
+/* ── Section header ─────────────────────────────────────────────── */
+.section-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 24px;
+}
+.section-header h2 { font-size: 24px; }
+.section-header p { color: var(--ink-soft); font-size: 13px; margin-top: 4px; }
+
+/* ── Cards ──────────────────────────────────────────────────────── */
+.card {
+  background: var(--white); border: 1px solid var(--rule);
+  border-radius: var(--radius); padding: 20px 22px;
+  box-shadow: var(--shadow);
+}
+.card + .card { margin-top: 12px; }
+.card-header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  margin-bottom: 14px;
+}
+.card-title { font-size: 16px; font-weight: 600; color: var(--ink); }
+.card-sub { font-size: 12px; color: var(--ink-soft); margin-top: 3px; }
+
+/* ── Grid layouts ───────────────────────────────────────────────── */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.grid-auto { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+@media (max-width: 700px) {
+  .grid-2, .grid-3 { grid-template-columns: 1fr; }
+}
+
+/* ── IP cards ───────────────────────────────────────────────────── */
+.ip-card {
+  background: var(--white); border: 1px solid var(--rule);
+  border-radius: var(--radius); padding: 18px 20px;
+  box-shadow: var(--shadow); transition: box-shadow .15s;
+  cursor: pointer;
+}
+.ip-card:hover { box-shadow: var(--shadow-md); }
+.ip-card-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+.ip-card-meta { font-size: 12px; color: var(--ink-soft); margin-bottom: 10px; }
+.ip-card-hash {
+  font-family: monospace; font-size: 11px; color: var(--ink-mid);
+  background: var(--surface); padding: 4px 8px; border-radius: 4px;
+  word-break: break-all; margin-bottom: 10px;
+}
+.ip-card-footer { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* ── Badges / chips ─────────────────────────────────────────────── */
+.badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; font-weight: 500; padding: 3px 8px;
+  border-radius: 20px; white-space: nowrap;
+}
+.badge-blue   { background: var(--accent-lt); color: var(--accent); }
+.badge-green  { background: var(--ok-lt);     color: var(--ok); }
+.badge-amber  { background: var(--warn-lt);   color: var(--warn); }
+.badge-red    { background: var(--danger-lt); color: var(--danger); }
+.badge-grey   { background: var(--surface);   color: var(--ink-soft); border: 1px solid var(--rule); }
+
+/* ── Form elements ──────────────────────────────────────────────── */
+.form-group { margin-bottom: 16px; }
+.form-label { display: block; font-size: 12px; font-weight: 500; color: var(--ink-mid); margin-bottom: 6px; }
+.form-hint { font-size: 11px; color: var(--ink-soft); margin-top: 5px; line-height: 1.4; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 600px) { .form-row { grid-template-columns: 1fr; } }
+
+.form-section {
+  border: 1px solid var(--rule); border-radius: var(--radius);
+  padding: 20px; margin-bottom: 20px; background: var(--white);
+}
+.form-section-title {
+  font-size: 13px; font-weight: 600; color: var(--ink);
+  margin-bottom: 16px; padding-bottom: 10px;
+  border-bottom: 1px solid var(--rule);
+}
+
+/* ── Buttons ────────────────────────────────────────────────────── */
+.btn { padding: 9px 18px; font-size: 13px; font-weight: 500; border-radius: var(--radius); border: none; }
+.btn-sm { padding: 6px 12px; font-size: 12px; }
+.btn-blue { background: var(--accent); color: var(--white); }
+.btn-blue:hover { background: var(--accent-dk); }
+.btn-outline { background: var(--white); color: var(--ink-mid); border: 1px solid var(--rule); }
+.btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+.btn-green { background: var(--ok); color: var(--white); }
+.btn-green:hover { background: #166534; }
+.btn-red { background: var(--danger); color: var(--white); }
+.btn-danger-soft { background: var(--danger-lt); color: var(--danger); }
+.btn-gold { background: var(--gold); color: var(--white); }
+.btn-full { width: 100%; }
+
+/* ── Tabs ───────────────────────────────────────────────────────── */
+.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--rule); margin-bottom: 24px; }
+.tab-btn {
+  background: none; color: var(--ink-soft); padding: 10px 16px;
+  font-size: 13px; border-radius: var(--radius) var(--radius) 0 0;
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+}
+.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 500; }
+.tab-btn:hover:not(.active) { color: var(--ink); background: var(--surface); }
+
+/* ── Table ──────────────────────────────────────────────────────── */
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; padding: 10px 12px; font-size: 11px; font-weight: 600; color: var(--ink-soft); background: var(--surface); border-bottom: 1px solid var(--rule); }
+td { padding: 11px 12px; border-bottom: 1px solid var(--rule); vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: var(--surface); }
+
+/* ── Metric tiles ───────────────────────────────────────────────── */
+.metric-tile {
+  background: var(--white); border: 1px solid var(--rule); border-radius: var(--radius);
+  padding: 18px 20px; box-shadow: var(--shadow);
+}
+.metric-label { font-size: 11px; font-weight: 500; color: var(--ink-soft); letter-spacing: .04em; margin-bottom: 8px; }
+.metric-value { font-family: 'DM Serif Display', serif; font-size: 28px; color: var(--ink); line-height: 1; }
+.metric-sub { font-size: 12px; color: var(--ink-soft); margin-top: 6px; }
+.metric-delta { font-size: 12px; color: var(--ok); font-weight: 500; }
+
+/* ── Detail panel ───────────────────────────────────────────────── */
+.detail-block { margin-bottom: 20px; }
+.detail-block dt { font-size: 11px; font-weight: 500; color: var(--ink-soft); margin-bottom: 4px; }
+.detail-block dd { font-size: 14px; color: var(--ink); word-break: break-all; }
+.detail-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+}
+@media (max-width: 600px) { .detail-grid { grid-template-columns: 1fr; } }
+
+/* ── Hash display ───────────────────────────────────────────────── */
+.hash-box {
+  font-family: monospace; font-size: 12px; padding: 10px 12px;
+  background: var(--surface); border: 1px solid var(--rule);
+  border-radius: var(--radius); word-break: break-all; color: var(--ink-mid);
+}
+
+/* ── Alert ──────────────────────────────────────────────────────── */
+.alert {
+  padding: 12px 16px; border-radius: var(--radius);
+  font-size: 13px; line-height: 1.5; display: flex; gap: 10px; align-items: flex-start;
+}
+.alert-warn { background: var(--warn-lt); color: var(--warn); border-left: 3px solid var(--warn); }
+.alert-ok   { background: var(--ok-lt);   color: var(--ok);   border-left: 3px solid var(--ok); }
+.alert-err  { background: var(--danger-lt);color: var(--danger);border-left: 3px solid var(--danger); }
+.alert-info { background: var(--accent-lt);color: var(--accent);border-left: 3px solid var(--accent); }
+
+/* ── Modal ──────────────────────────────────────────────────────── */
+.modal-backdrop {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.5); z-index: 200; align-items: center; justify-content: center;
+}
+.modal-backdrop.open { display: flex; }
+.modal {
+  background: var(--white); border-radius: 10px; padding: 28px;
+  max-width: 560px; width: calc(100% - 32px); max-height: 90vh;
+  overflow-y: auto; box-shadow: var(--shadow-md);
+}
+.modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+.modal-header h3 { font-size: 20px; }
+.modal-close { background: none; border: 1px solid var(--rule); padding: 6px 10px; color: var(--ink-mid); border-radius: var(--radius); }
+
+/* ── Toast ──────────────────────────────────────────────────────── */
+#toast-area {
+  position: fixed; bottom: 24px; right: 24px; z-index: 300;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.toast {
+  padding: 12px 18px; border-radius: var(--radius); font-size: 13px;
+  color: var(--white); max-width: 340px; box-shadow: var(--shadow-md);
+  animation: slideUp .2s ease;
+}
+.toast-ok   { background: var(--ok); }
+.toast-err  { background: var(--danger); }
+.toast-info { background: var(--accent); }
+@keyframes slideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ── Misc ───────────────────────────────────────────────────────── */
+.empty-state {
+  text-align: center; padding: 48px 20px;
+  color: var(--ink-soft); font-size: 14px;
+}
+.empty-state .icon { font-size: 36px; margin-bottom: 12px; }
+.divider { border: none; border-top: 1px solid var(--rule); margin: 20px 0; }
+.text-soft { color: var(--ink-soft); }
+.text-sm { font-size: 12px; }
+.flex { display: flex; align-items: center; }
+.gap-8 { gap: 8px; }
+.gap-12 { gap: 12px; }
+.mt-8 { margin-top: 8px; }
+.mt-16 { margin-top: 16px; }
+.mb-16 { margin-bottom: 16px; }
+.w-full { width: 100%; }
+.spinner {
+  width: 18px; height: 18px; border: 2px solid rgba(255,255,255,.3);
+  border-top-color: white; border-radius: 50%;
+  animation: spin .6s linear infinite; display: inline-block;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.license-card {
+  background: var(--white); border: 1px solid var(--rule);
+  border-radius: var(--radius); padding: 18px 20px;
+  box-shadow: var(--shadow);
+}
+.license-card-title { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+.license-card-fee { font-family: 'DM Serif Display', serif; font-size: 20px; color: var(--accent); }
+.license-card-fee span { font-family: 'Inter', sans-serif; font-size: 12px; color: var(--ink-soft); }
+
+.verify-box {
+  background: var(--white); border: 1px solid var(--rule);
+  border-radius: var(--radius); padding: 24px;
+  box-shadow: var(--shadow);
+}
+
+.back-btn { background: none; color: var(--ink-soft); padding: 0; font-size: 13px; margin-bottom: 20px; display: flex; align-items: center; gap: 6px; }
+.back-btn:hover { color: var(--accent); }
+
+/* ── Search bar ─────────────────────────────────────────────────── */
+.search-bar { position: relative; max-width: 480px; }
+.search-bar input { padding-left: 36px; }
+.search-bar::before {
+  content: '🔍'; position: absolute; left: 10px; top: 50%;
+  transform: translateY(-50%); font-size: 14px; pointer-events: none;
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- Top bar -->
+<header id="topbar">
+  <div class="logo">
+    IPConfig<span class="dot">.</span>
+    <span class="logo-badge">REGISTRY</span>
+  </div>
+  <nav class="topnav">
+    <button class="active" onclick="showPage('landing')">Home</button>
+    <button onclick="showPage('explorer')">Explore</button>
+    <button onclick="showPage('register')">Register IP</button>
+    <button onclick="showPage('marketplace')">Marketplace</button>
+    <button onclick="showPage('creator')">Creator</button>
+    <button onclick="showPage('licensee')">Licensee</button>
+    <button onclick="showPage('admin')">Admin</button>
+  </nav>
+  <button id="wallet-btn" onclick="connectWallet()">Connect Wallet</button>
+</header>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!--  LANDING                                                        -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div id="page-landing" class="page active">
+  <div class="hero">
+    <div class="hero-inner">
+      <h1>Register, protect and<br/><em>license your work</em><br/>onchain</h1>
+      <p>IPConfig gives creators a timestamped, tamper-evident evidence record of their intellectual property claims — with onchain licensing, revenue tracking, and dispute management.</p>
+      <div class="hero-actions">
+        <button class="btn-primary" onclick="showPage('register')">Register your IP</button>
+        <button class="btn-ghost" onclick="showPage('explorer')">Browse registry</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="disclaimer-banner">
+    <span class="icon">⚖️</span>
+    <p><strong>Important legal notice:</strong> Registering a work on IPConfig creates a timestamped, verifiable evidence record — it does <strong>not</strong> grant legal copyright protection and does not constitute legal proof of authorship or originality. A cryptographic hash demonstrates that a specific file existed at the time of registration, not that the registrant created it. Legal copyright recognition is determined by applicable national law, not by blockchain registration. Consult a legal professional for formal intellectual property protection.</p>
+  </div>
+
+  <div class="features-grid">
+    <div class="feature-item">
+      <div class="feature-icon">🔏</div>
+      <h3>Tamper-evident records</h3>
+      <p>Submit a cryptographic hash of your work. It is recorded onchain with a block timestamp — creating evidence that the hash existed at that moment in time.</p>
+    </div>
+    <div class="feature-item">
+      <div class="feature-icon">📄</div>
+      <h3>Versioned license terms</h3>
+      <p>Publish license terms on-chain. Each version is immutable — previous licensees are always governed by the terms they accepted, not updated ones.</p>
+    </div>
+    <div class="feature-item">
+      <div class="feature-icon">💳</div>
+      <h3>Instant licensing</h3>
+      <p>Licensees browse the registry and purchase licenses directly on BOT Chain. Licensing fees are split between rights holders and the platform automatically.</p>
+    </div>
+    <div class="feature-item">
+      <div class="feature-icon">🔄</div>
+      <h3>Ownership transfer</h3>
+      <p>Transfer IP ownership through an explicit two-step process — the new owner must accept. No unilateral silent transfers.</p>
+    </div>
+    <div class="feature-item">
+      <div class="feature-icon">⚡</div>
+      <h3>Revenue on-chain</h3>
+      <p>Licensing revenue accrues on-chain in BOT or USDT. Withdraw to your wallet at any time — no intermediary, no delay.</p>
+    </div>
+    <div class="feature-item">
+      <div class="feature-icon">🛡️</div>
+      <h3>Dispute management</h3>
+      <p>Anyone can file a dispute against a registration. Administrators review and can flag suspicious records, maintaining registry integrity.</p>
+    </div>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat-item">
+      <span class="num" id="stat-total-ip">—</span>
+      <span class="label">Registered works</span>
+    </div>
+    <div class="stat-item">
+      <span class="num" id="stat-total-lic">—</span>
+      <span class="label">Licenses issued</span>
+    </div>
+    <div class="stat-item">
+      <span class="num">BOT Chain</span>
+      <span class="label">Network</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!--  IP EXPLORER                                                    -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div id="page-explorer" class="page">
+  <div class="section-header">
+    <div>
+      <h2>IP Registry</h2>
+      <p>Browse all registered intellectual property claims</p>
+    </div>
+    <div class="search-bar">
+      <input type="text" id="explorer-search" placeholder="Search by title…" oninput="filterExplorer()"/>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;" id="category-filters">
+    <button class="btn btn-sm btn-blue" onclick="filterByCategory(null, this)">All</button>
+    <button class="btn btn-sm btn-outline" onclick="filterByCategory(0, this)">Literary</button>
+    <button class="btn btn-sm btn-outline" onclick="filterByCategory(1, this)">Musical</button>
+    <button class="btn btn-sm btn-outline" onclick="filterByCategory(2, this)">Artistic</button>
+    <button class="btn btn-sm btn-outline" onclick="filterByCategory(3, this)">Software</button>
+    <button class="btn btn-sm btn-outline" onclick="filterByCategory(4, this)">Film</button>
+    <button class="btn btn-sm btn-outline" onclick="filterByCategory(5, this)">Patent</button>
+    <button class="btn btn-sm btn-outline" onclick="filterByCategory(6, this)">Trademark</button>
+    <button class="btn btn-sm btn-outline" onclick="filterByCategory(7, this)">Other</button>
+  </div>
+
+  <div id="explorer-grid" class="grid-auto">
+    <div class="empty-state"><div class="icon">📂</div><p>Connect your wallet to load the registry.</p></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!--  IP DETAILS (dynamic)                                          -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div id="page-ip-detail" class="page">
+  <button class="back-btn" onclick="showPage('explorer')">← Back to registry</button>
+  <div id="ip-detail-content"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!--  REGISTER IP                                                    -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div id="page-register" class="page">
+  <div class="section-header">
+    <div>
+      <h2>Register Intellectual Property</h2>
+      <p>Create a timestamped, onchain evidence record of your work</p>
+    </div>
+  </div>
+
+  <div class="alert alert-warn mb-16">
+    <span>⚖️</span>
+    <div>Registration on IPConfig records your claim and work hash on a blockchain. This provides evidence that a specific file existed at this time — it does <strong>not</strong> automatically prove authorship, originality, or grant legal copyright. The hash alone does not prove you created the work.</div>
+  </div>
+
+  <div class="grid-2">
+    <div>
+      <form id="register-form">
+        <div class="form-section">
+          <div class="form-section-title">Work details</div>
+          <div class="form-group">
+            <label class="form-label">Title *</label>
+            <input type="text" id="reg-title" placeholder="Name your work" required/>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Category *</label>
+              <select id="reg-category">
+                <option value="0">Literary</option>
+                <option value="1">Musical</option>
+                <option value="2">Artistic</option>
+                <option value="3">Software</option>
+                <option value="4">Film</option>
+                <option value="5">Patent</option>
+                <option value="6">Trademark</option>
+                <option value="7">Other</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Creation date *</label>
+              <input type="date" id="reg-creation-date" required/>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Description</label>
+            <textarea id="reg-description" placeholder="Describe the nature and content of your work…"></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Metadata URI</label>
+            <input type="text" id="reg-metadata-uri" placeholder="Optional external reference (e.g. IPFS CID)"/>
+            <div class="form-hint">Do not store the actual file — only a link or identifier.</div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <div class="form-section-title">Work hash — evidence of existence</div>
+          <div class="form-group">
+            <label class="form-label">Upload file to generate hash (file never leaves your device)</label>
+            <input type="file" id="reg-file-input" onchange="hashFile(this)"/>
+            <div class="form-hint">The file is hashed locally using SHA-256. Only the hash is submitted to the blockchain — never the file itself.</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Or enter hex hash manually (0x…)</label>
+            <input type="text" id="reg-hash" placeholder="0x…" pattern="^0x[0-9a-fA-F]{64}$"/>
+          </div>
+          <div id="hash-preview" style="display:none;" class="hash-box mt-8"></div>
+        </div>
+
+        <div class="form-section">
+          <div class="form-section-title">Rights holder</div>
+          <div class="form-group">
+            <label class="form-label">Rights holder wallet address</label>
+            <input type="text" id="reg-rights-holder" placeholder="0x… (defaults to your wallet)"/>
+            <div class="form-hint">The declared holder of rights over this IP. Can differ from registrant.</div>
+          </div>
+        </div>
+
+        <button type="button" class="btn btn-blue btn-full" onclick="registerIP()">
+          Register IP record
+        </button>
+      </form>
+    </div>
+
+    <div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">What gets recorded</span></div>
+        <div style="font-size:13px;color:var(--ink-mid);line-height:1.7;">
+          <p><strong>Recorded on-chain:</strong></p>
+          <ul style="padding-left:18px;margin:8px 0 16px;">
+            <li>Title, category, description</li>
+            <li>Declared creation date</li>
+            <li>Block timestamp of registration</li>
+            <li>SHA-256 hash of your work</li>
+            <li>Rights holder wallet address</li>
+            <li>Metadata URI (if provided)</li>
+          </ul>
+          <p><strong>Not recorded:</strong></p>
+          <ul style="padding-left:18px;margin:8px 0 16px;">
+            <li>The actual file or its contents</li>
+            <li>Personal identifying information</li>
+            <li>Legal evidence beyond the timestamp</li>
+          </ul>
+          <hr class="divider"/>
+          <p style="font-size:12px;color:var(--ink-soft);">Registration fee applies. This covers transaction costs and platform maintenance. It does not constitute payment for legal services.</p>
+        </div>
+      </div>
+
+      <div class="card mt-8" id="reg-fee-card">
+        <div class="metric-label">Registration fee</div>
+        <div class="metric-value" id="reg-fee-display">—</div>
+        <div class="metric-sub">Payable in BOT</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!--  LICENSING MARKETPLACE                                          -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div id="page-marketplace" class="page">
+  <div class="section-header">
+    <div>
+      <h2>Licensing Marketplace</h2>
+      <p>Browse and purchase licenses for registered intellectual property</p>
+    </div>
+  </div>
+
+  <div id="marketplace-grid" class="grid-auto">
+    <div class="empty-state"><div class="icon">🏪</div><p>Connect your wallet to browse available licenses.</p></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!--  CREATOR DASHBOARD                                              -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div id="page-creator" class="page">
+  <div class="section-header"><div><h2>Creator Dashboard</h2><p>Manage your registered IP and licensing revenue</p></div></div>
+
+  <div class="grid-3 mb-16">
+    <div class="metric-tile">
+      <div class="metric-label">Registered works</div>
+      <div class="metric-value" id="creator-ip-count">—</div>
+    </div>
+    <div class="metric-tile">
+      <div class="metric-label">Pending revenue — BOT</div>
+      <div class="metric-value" id="creator-rev-bot">—</div>
+      <div class="metric-sub"><button class="btn btn-sm btn-blue mt-8" onclick="withdrawBOT()">Withdraw BOT</button></div>
+    </div>
+    <div class="metric-tile">
+      <div class="metric-label">Pending revenue — USDT</div>
+      <div class="metric-value" id="creator-rev-usdt">—</div>
+      <div class="metric-sub"><button class="btn btn-sm btn-green mt-8" onclick="withdrawUSDT()">Withdraw USDT</button></div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="creatorTab('my-ip', this)">My IP records</button>
+    <button class="tab-btn" onclick="creatorTab('publish-terms', this)">Publish terms</button>
+    <button class="tab-btn" onclick="creatorTab('transfer', this)">Transfer ownership</button>
+  </div>
+
+  <div id="creator-tab-my-ip">
+    <div id="creator-ip-list" class="grid-auto">
+      <div class="empty-state"><div class="icon">🗂️</div><p>No IP records found. <a href="#" onclick="showPage('register')">Register your first work.</a></p></div>
+    </div>
+  </div>
+
+  <div id="creator-tab-publish-terms" style="display:none;">
+    <div class="card">
+      <div class="card-header"><span class="card-title">Publish license terms</span></div>
+      <div class="alert alert-info mb-16">
+        <span>ℹ️</span>
+        <div>Publishing new terms does not alter previously accepted licenses. Each licensee retains the terms version they purchased under — this is enforced by the contract.</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Select IP</label>
+        <select id="terms-ip-select"><option value="">— choose IP —</option></select>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">License fee in BOT (18 dec)</label>
+          <input type="text" id="terms-fee-bot" placeholder="e.g. 1000000000000000000"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">License fee in USDT (6 dec)</label>
+          <input type="text" id="terms-fee-usdt" placeholder="e.g. 5000000"/>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Duration (days, 0 = perpetual)</label>
+          <input type="number" id="terms-duration" placeholder="365" min="0"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Permitted uses</label>
+          <input type="text" id="terms-permitted" placeholder="e.g. Personal, educational use"/>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Restrictions</label>
+        <input type="text" id="terms-restrictions" placeholder="e.g. No commercial redistribution"/>
+      </div>
+      <div style="display:flex;gap:20px;margin-bottom:16px;flex-wrap:wrap;">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;">
+          <input type="checkbox" id="terms-commercial"/> Commercial use allowed
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;">
+          <input type="checkbox" id="terms-derivatives"/> Derivatives allowed
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;">
+          <input type="checkbox" id="terms-attribution" checked/> Attribution required
+        </label>
+      </div>
+      <button class="btn btn-blue" onclick="publishTerms()">Publish terms version</button>
+    </div>
+  </div>
+
+  <div id="creator-tab-transfer" style="display:none;">
+    <div class="card">
+      <div class="card-header"><span class="card-title">Propose ownership transfer</span></div>
+      <div class="alert alert-warn mb-16">
+        <span>⚠️</span>
+        <div>Ownership transfer is a two-step process. The proposed new owner must explicitly accept. The transfer is irreversible once accepted.</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Select IP</label>
+        <select id="transfer-ip-select"><option value="">— choose IP —</option></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Proposed new owner wallet</label>
+        <input type="text" id="transfer-to" placeholder="0x…"/>
+      </div>
+      <button class="btn btn-gold" onclick="proposeTransfer()">Propose transfer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!--  LICENSEE DASHBOARD                                             -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div id="page-licensee" class="page">
+  <div class="section-header"><div><h2>Licensee Dashboard</h2><p>Your purchased licenses and verification tools</p></div></div>
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="licenseeTab('my-licenses', this)">My licenses</button>
+    <button class="tab-btn" onclick="licenseeTab('verify', this)">Verify a license</button>
+    <button class="tab-btn" onclick="licenseeTab('accept-transfer', this)">Accept ownership transfer</button>
+  </div>
+
+  <div id="licensee-tab-my-licenses">
+    <div id="licensee-list" class="grid-auto">
+      <div class="empty-state"><div class="icon">📋</div><p>Connect wallet to view your licenses.</p></div>
+    </div>
+  </div>
+
+  <div id="licensee-tab-verify" style="display:none;">
+    <div class="verify-box">
+      <h3 style="font-size:18px;margin-bottom:16px;">Verify license status</h3>
+      <div class="form-group">
+        <label class="form-label">License ID</label>
+        <input type="number" id="verify-license-id" placeholder="Enter license ID" min="1"/>
+      </div>
+      <button class="btn btn-blue" onclick="verifyLicense()">Check status</button>
+      <div id="verify-result" class="mt-16"></div>
+    </div>
+  </div>
+
+  <div id="licensee-tab-accept-transfer" style="display:none;">
+    <div class="card">
+      <div class="card-header"><span class="card-title">Accept an IP ownership transfer</span></div>
+      <p class="text-soft text-sm mb-16">If another rights holder has proposed transferring an IP to your wallet, enter the IP ID to accept.</p>
+      <div class="form-group">
+        <label class="form-label">IP ID</label>
+        <input type="number" id="accept-transfer-id" placeholder="IP record ID" min="1"/>
+      </div>
+      <button class="btn btn-green" onclick="acceptTransfer()">Accept ownership</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!--  ADMIN DASHBOARD                                                -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div id="page-admin" class="page">
+  <div class="section-header"><div><h2>Admin Dashboard</h2><p>Platform management and dispute resolution</p></div></div>
+
+  <div class="grid-3 mb-16">
+    <div class="metric-tile">
+      <div class="metric-label">Total registered IP</div>
+      <div class="metric-value" id="admin-total-ip">—</div>
+    </div>
+    <div class="metric-tile">
+      <div class="metric-label">Total licenses issued</div>
+      <div class="metric-value" id="admin-total-lic">—</div>
+    </div>
+    <div class="metric-tile">
+      <div class="metric-label">Platform fee</div>
+      <div class="metric-value" id="admin-fee-display">—</div>
+      <div class="metric-sub">basis points</div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="adminTab('platform', this)">Platform settings</button>
+    <button class="tab-btn" onclick="adminTab('flag', this)">Flag / unflag IP</button>
+    <button class="tab-btn" onclick="adminTab('disputes', this)">Disputes</button>
+    <button class="tab-btn" onclick="adminTab('withdraw', this)">Withdraw fees</button>
+  </div>
+
+  <div id="admin-tab-platform">
+    <div class="card">
+      <div class="card-header"><span class="card-title">Platform settings</span></div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Registration fee (BOT wei)</label>
+          <input type="text" id="admin-reg-fee" placeholder="e.g. 10000000000000000"/>
+          <button class="btn btn-blue mt-8" onclick="setRegFee()">Update fee</button>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Platform fee (basis points, max 1000)</label>
+          <input type="number" id="admin-platform-fee" placeholder="e.g. 300" min="0" max="1000"/>
+          <button class="btn btn-blue mt-8" onclick="setPlatformFee()">Update fee</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="admin-tab-flag" style="display:none;">
+    <div class="card">
+      <div class="card-header"><span class="card-title">Flag or unflag an IP record</span></div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">IP ID</label>
+          <input type="number" id="admin-flag-id" placeholder="IP record ID" min="1"/>
+        </div>
+        <div class="form-group" style="display:flex;align-items:flex-end;gap:8px;">
+          <button class="btn btn-red" onclick="adminFlag(true)">Flag as suspicious</button>
+          <button class="btn btn-outline" onclick="adminFlag(false)">Remove flag</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="admin-tab-disputes" style="display:none;">
+    <div class="form-section">
+      <div class="form-section-title">Resolve a dispute</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Dispute ID</label>
+          <input type="number" id="admin-dispute-id" placeholder="Dispute ID" min="1"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Outcome</label>
+          <select id="admin-dispute-outcome">
+            <option value="1">Resolved (flag IP)</option>
+            <option value="2">Dismissed</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Resolution notes</label>
+        <textarea id="admin-dispute-resolution" placeholder="Explain the resolution…"></textarea>
+      </div>
+      <button class="btn btn-blue" onclick="resolveDispute()">Submit resolution</button>
+    </div>
+  </div>
+
+  <div id="admin-tab-withdraw" style="display:none;">
+    <div class="card">
+      <div class="card-header"><span class="card-title">Withdraw platform fees</span></div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Token (address(0) for BOT)</label>
+          <input type="text" id="admin-wd-token" placeholder="0x0000… or USDT address"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Amount (wei / smallest unit)</label>
+          <input type="text" id="admin-wd-amount" placeholder="Amount"/>
+        </div>
+      </div>
+      <button class="btn btn-blue" onclick="adminWithdraw()">Withdraw</button>
+    </div>
+  </div>
+</div>
+
+<!-- Purchase license modal -->
+<div id="purchase-modal" class="modal-backdrop">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Purchase license</h3>
+      <button class="modal-close" onclick="closeModal('purchase-modal')">✕</button>
+    </div>
+    <div id="purchase-modal-content"></div>
+    <div class="form-group mt-16">
+      <label class="form-label">Note to rights holder (optional)</label>
+      <input type="text" id="purchase-note" placeholder="Describe your intended use…"/>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:20px;">
+      <button class="btn btn-blue" onclick="purchaseBOT()">Pay with BOT</button>
+      <button class="btn btn-green" onclick="purchaseUSDT()">Pay with USDT</button>
+      <button class="btn btn-outline" onclick="closeModal('purchase-modal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Dispute modal -->
+<div id="dispute-modal" class="modal-backdrop">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Report a dispute</h3>
+      <button class="modal-close" onclick="closeModal('dispute-modal')">✕</button>
+    </div>
+    <p class="text-soft text-sm mb-16">Report a concern about this IP record to administrators for review.</p>
+    <div class="form-group">
+      <label class="form-label">Reason *</label>
+      <textarea id="dispute-reason" placeholder="Describe your concern in detail…"></textarea>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:16px;">
+      <button class="btn btn-red" onclick="submitDispute()">Submit report</button>
+      <button class="btn btn-outline" onclick="closeModal('dispute-modal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-area"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+<script>
+// ════════════════════════════════════════════════════════════════
+//  CONTRACT CONFIG
+// ════════════════════════════════════════════════════════════════
+const CONTRACT_ADDRESS = "0x0000000000000000000000000000000000000000"; // replace after deploy
+const USDT_ADDRESS     = "0x0000000000000000000000000000000000000000"; // replace after deploy
+
+const ABI = [
+  "function registerIP(string title,uint8 category,string description,uint256 creationDate,bytes32 workHash,string metadataUri,address rightsHolder) payable returns(uint256)",
+  "function publishLicenseTerms(uint256 ipId,string permittedUses,string restrictions,bool commercialAllowed,bool derivativesAllowed,bool attributionRequired,uint256 feeBOT,uint256 feeUSDT,uint256 durationDays) returns(uint256)",
+  "function purchaseLicenseWithBOT(uint256 ipId,string licenseeNote) payable returns(uint256)",
+  "function purchaseLicenseWithUSDT(uint256 ipId,string licenseeNote) returns(uint256)",
+  "function revokeLicense(uint256 licenseId)",
+  "function cancelLicense(uint256 licenseId)",
+  "function withdrawRevenueBOT()",
+  "function withdrawRevenueUSDT()",
+  "function proposeOwnershipTransfer(uint256 ipId,address proposed)",
+  "function acceptOwnershipTransfer(uint256 ipId)",
+  "function reportDispute(uint256 ipId,string reason)",
+  "function flagIP(uint256 ipId,bool flagged)",
+  "function resolveDispute(uint256 disputeId,uint8 outcome,string resolution)",
+  "function setRegistrationFee(uint256 fee)",
+  "function setPlatformFee(uint256 bps)",
+  "function withdrawAdminFees(address token,uint256 amount)",
+  "function getIPRecord(uint256 ipId) view returns(tuple(uint256 id,address rightsHolder,string title,uint8 category,string description,uint256 creationDate,uint256 registrationDate,bytes32 workHash,string metadataUri,bool isActive,bool isFlagged,uint256 activeTermsId))",
+  "function getActiveTerms(uint256 ipId) view returns(tuple(uint256 id,uint256 ipId,uint256 version,string permittedUses,string restrictions,bool commercialAllowed,bool derivativesAllowed,bool attributionRequired,uint256 feeBOT,uint256 feeUSDT,uint256 durationDays,uint256 publishedAt))",
+  "function getLicense(uint256 licenseId) view returns(tuple(uint256 id,uint256 ipId,uint256 termsId,address licensee,uint8 payToken,uint256 amountPaid,uint256 issuedAt,uint256 expiresAt,uint8 status,string licenseeNote))",
+  "function isLicenseActive(uint256 licenseId) view returns(bool)",
+  "function getHolderIPs(address holder) view returns(uint256[])",
+  "function getLicenseeLicenses(address licensee) view returns(uint256[])",
+  "function getIPLicenses(uint256 ipId) view returns(uint256[])",
+  "function getTotalIPs() view returns(uint256)",
+  "function getTotalLicenses() view returns(uint256)",
+  "function pendingRevenueBOT(address) view returns(uint256)",
+  "function pendingRevenueUSDT(address) view returns(uint256)",
+  "function registrationFeeWei() view returns(uint256)",
+  "function platformFeeBps() view returns(uint256)",
+  "function admin() view returns(address)",
+  "event IPRegistered(uint256 indexed ipId,address indexed rightsHolder,bytes32 workHash,string title)",
+  "event LicensePurchased(uint256 indexed licenseId,uint256 indexed ipId,address indexed licensee)"
+];
+
+const USDT_ABI = [
+  "function approve(address spender,uint256 amount) returns(bool)",
+  "function allowance(address owner,address spender) view returns(uint256)"
+];
+
+// ════════════════════════════════════════════════════════════════
+//  STATE
+// ════════════════════════════════════════════════════════════════
+let provider, signer, contract, usdtContract;
+let walletAddress = null;
+let currentPage = 'landing';
+let selectedIPForPurchase = null;
+let selectedIPForDispute = null;
+let explorerAllIPs = [];
+let activeFilterCat = null;
+
+const CATEGORIES = ['Literary','Musical','Artistic','Software','Film','Patent','Trademark','Other'];
+const CAT_ICONS  = ['📚','🎵','🎨','💻','🎬','🔧','™️','📁'];
+
+// ════════════════════════════════════════════════════════════════
+//  NAV
+// ════════════════════════════════════════════════════════════════
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  document.querySelectorAll('.topnav button').forEach(b => b.classList.remove('active'));
+  const map = {
+    landing: 0, explorer: 1, register: 2, marketplace: 3, creator: 4, licensee: 5, admin: 6
+  };
+  if (map[id] !== undefined) document.querySelectorAll('.topnav button')[map[id]].classList.add('active');
+  currentPage = id;
+  if (walletAddress) {
+    if (id === 'explorer' || id === 'landing') loadExplorerData();
+    if (id === 'marketplace') loadMarketplace();
+    if (id === 'creator') loadCreatorDashboard();
+    if (id === 'licensee') loadLicenseeDashboard();
+    if (id === 'admin') loadAdminDashboard();
+    if (id === 'register') loadRegFee();
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+//  WALLET
+// ════════════════════════════════════════════════════════════════
+async function connectWallet() {
+  if (!window.ethereum) return toast('MetaMask or compatible wallet not detected.', 'err');
+  try {
+    provider = new ethers.BrowserProvider(window.ethereum);
+    await provider.send('eth_requestAccounts', []);
+    signer = await provider.getSigner();
+    walletAddress = await signer.getAddress();
+    contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+    usdtContract = new ethers.Contract(USDT_ADDRESS, USDT_ABI, signer);
+
+    const btn = document.getElementById('wallet-btn');
+    btn.textContent = walletAddress.slice(0,6) + '…' + walletAddress.slice(-4);
+    btn.classList.add('connected');
+    toast('Wallet connected.', 'ok');
+    showPage(currentPage);
+  } catch (e) {
+    toast('Connection failed: ' + e.message, 'err');
+  }
+}
+
+function requireWallet() {
+  if (!walletAddress) { toast('Connect your wallet first.', 'info'); return false; }
+  return true;
+}
+
+// ════════════════════════════════════════════════════════════════
+//  HASH FILE
+// ════════════════════════════════════════════════════════════════
+async function hashFile(input) {
+  const file = input.files[0]; if (!file) return;
+  const buffer = await file.arrayBuffer();
+  const hashBuf = await crypto.subtle.digest('SHA-256', buffer);
+  const hashArr = Array.from(new Uint8Array(hashBuf));
+  const hex = '0x' + hashArr.map(b => b.toString(16).padStart(2,'0')).join('');
+  document.getElementById('reg-hash').value = hex;
+  const prev = document.getElementById('hash-preview');
+  prev.style.display = 'block';
+  prev.textContent = '📎 ' + file.name + '\nSHA-256: ' + hex;
+}
+
+// ════════════════════════════════════════════════════════════════
+//  REGISTER IP
+// ════════════════════════════════════════════════════════════════
+async function loadRegFee() {
+  try {
+    const fee = await contract.registrationFeeWei();
+    document.getElementById('reg-fee-display').textContent = ethers.formatEther(fee) + ' BOT';
+  } catch {}
+}
+
+async function registerIP() {
+  if (!requireWallet()) return;
+  const title    = document.getElementById('reg-title').value.trim();
+  const category = parseInt(document.getElementById('reg-category').value);
+  const desc     = document.getElementById('reg-description').value.trim();
+  const dateVal  = document.getElementById('reg-creation-date').value;
+  const hashVal  = document.getElementById('reg-hash').value.trim();
+  const uri      = document.getElementById('reg-metadata-uri').value.trim();
+  let   holder   = document.getElementById('reg-rights-holder').value.trim() || walletAddress;
+
+  if (!title) return toast('Title is required.', 'err');
+  if (!hashVal || !/^0x[0-9a-fA-F]{64}$/.test(hashVal)) return toast('Enter a valid 32-byte hex hash (0x + 64 hex chars).', 'err');
+  if (!dateVal) return toast('Creation date is required.', 'err');
+
+  const creationTs = Math.floor(new Date(dateVal).getTime() / 1000);
+
+  try {
+    const fee = await contract.registrationFeeWei();
+    const tx = await contract.registerIP(title, category, desc, creationTs, hashVal, uri, holder, { value: fee });
+    toast('Transaction sent — waiting for confirmation…', 'info');
+    const receipt = await tx.wait();
+    toast('IP registered successfully!', 'ok');
+    document.getElementById('register-form').reset();
+    document.getElementById('hash-preview').style.display = 'none';
+    showPage('creator');
+  } catch (e) {
+    toast(parseError(e), 'err');
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+//  EXPLORER
+// ════════════════════════════════════════════════════════════════
+async function loadExplorerData() {
+  if (!walletAddress) return;
+  try {
+    const total = Number(await contract.getTotalIPs());
+    document.getElementById('stat-total-ip').textContent = total;
+    const totalLic = Number(await contract.getTotalLicenses());
+    document.getElementById('stat-total-lic').textContent = totalLic;
+
+    const ips = [];
+    for (let i = 1; i <= total; i++) {
+      const ip = await contract.getIPRecord(i);
+      ips.push(ip);
+    }
+    explorerAllIPs = ips;
+    renderExplorer(ips);
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+function renderExplorer(ips) {
+  const grid = document.getElementById('explorer-grid');
+  if (!ips.length) {
+    grid.innerHTML = '<div class="empty-state"><div class="icon">📂</div><p>No IP records found.</p></div>';
+    return;
+  }
+  grid.innerHTML = ips.map(ip => ipCard(ip)).join('');
+}
+
+function filterExplorer() {
+  const q = document.getElementById('explorer-search').value.toLowerCase();
+  let filtered = explorerAllIPs.filter(ip => ip.title.toLowerCase().includes(q));
+  if (activeFilterCat !== null) filtered = filtered.filter(ip => Number(ip.category) === activeFilterCat);
+  renderExplorer(filtered);
+}
+
+function filterByCategory(cat, btn) {
+  activeFilterCat = cat;
+  document.querySelectorAll('#category-filters button').forEach(b => {
+    b.className = 'btn btn-sm btn-outline';
+  });
+  btn.className = 'btn btn-sm btn-blue';
+  filterExplorer();
+}
+
+function ipCard(ip) {
+  const cat = CATEGORIES[Number(ip.category)] || 'Other';
+  const icon = CAT_ICONS[Number(ip.category)] || '📁';
+  const date = new Date(Number(ip.registrationDate) * 1000).toLocaleDateString();
+  const flagged = ip.isFlagged ? '<span class="badge badge-red">⚠ Flagged</span>' : '';
+  const holder = ip.rightsHolder.slice(0,6) + '…' + ip.rightsHolder.slice(-4);
+  return `
+    <div class="ip-card" onclick="showIPDetail(${ip.id})">
+      <div class="ip-card-title">${icon} ${escHtml(ip.title)}</div>
+      <div class="ip-card-meta">${cat} · Registered ${date} · Holder: ${holder}</div>
+      <div class="ip-card-hash">${ip.workHash}</div>
+      <div class="ip-card-footer">
+        <span class="badge badge-blue">${cat}</span>
+        ${flagged}
+        <span class="badge badge-grey text-sm">ID #${ip.id}</span>
+      </div>
+    </div>`;
+}
+
+async function showIPDetail(ipId) {
+  if (!walletAddress) return;
+  try {
+    const ip = await contract.getIPRecord(ipId);
+    const terms = ip.activeTermsId > 0 ? await contract.getActiveTerms(ipId) : null;
+    const licIds = await contract.getIPLicenses(ipId);
+
+    const cat = CATEGORIES[Number(ip.category)];
+    const icon = CAT_ICONS[Number(ip.category)];
+    const regDate = new Date(Number(ip.registrationDate)*1000).toLocaleString();
+    const creDate = new Date(Number(ip.creationDate)*1000).toLocaleDateString();
+    const isHolder = ip.rightsHolder.toLowerCase() === walletAddress.toLowerCase();
+
+    let termsHtml = '<p class="text-soft text-sm">No license terms have been published for this IP.</p>';
+    if (terms && terms.id > 0) {
+      const feeBOT  = ethers.formatEther(terms.feeBOT);
+      const feeUSDT = (Number(terms.feeUSDT) / 1e6).toFixed(2);
+      const dur     = terms.durationDays == 0 ? 'Perpetual' : terms.durationDays + ' days';
+      termsHtml = `
+        <div class="detail-grid">
+          <dl class="detail-block"><dt>Version</dt><dd>${terms.version}</dd></dl>
+          <dl class="detail-block"><dt>Duration</dt><dd>${dur}</dd></dl>
+          <dl class="detail-block"><dt>Fee (BOT)</dt><dd>${feeBOT} BOT</dd></dl>
+          <dl class="detail-block"><dt>Fee (USDT)</dt><dd>${feeUSDT} USDT</dd></dl>
+          <dl class="detail-block"><dt>Commercial use</dt><dd>${terms.commercialAllowed ? '✓ Allowed' : '✗ Not allowed'}</dd></dl>
+          <dl class="detail-block"><dt>Derivatives</dt><dd>${terms.derivativesAllowed ? '✓ Allowed' : '✗ Not allowed'}</dd></dl>
+          <dl class="detail-block"><dt>Attribution</dt><dd>${terms.attributionRequired ? 'Required' : 'Not required'}</dd></dl>
+          <dl class="detail-block"><dt>Permitted uses</dt><dd>${escHtml(terms.permittedUses)}</dd></dl>
+          <dl class="detail-block"><dt>Restrictions</dt><dd>${escHtml(terms.restrictions)}</dd></dl>
+        </div>`;
+    }
+
+    const purchaseBtn = (!isHolder && terms && terms.id > 0)
+      ? `<button class="btn btn-blue" onclick="openPurchaseModal(${ipId})">Purchase license</button>`
+      : '';
+    const disputeBtn = `<button class="btn btn-danger-soft btn-sm" onclick="openDisputeModal(${ipId})">Report dispute</button>`;
+    const publishTermsBtn = isHolder
+      ? `<button class="btn btn-outline btn-sm" onclick="showPage('creator');creatorTab('publish-terms', document.querySelectorAll('.tab-btn')[1])">Publish terms</button>`
+      : '';
+
+    document.getElementById('ip-detail-content').innerHTML = `
+      <div class="section-header">
+        <div>
+          <h2>${icon} ${escHtml(ip.title)}</h2>
+          <p>${cat} · IP #${ip.id} ${ip.isFlagged ? '· <span style="color:var(--danger)">⚠ Flagged for review</span>' : ''}</p>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">${purchaseBtn}${publishTermsBtn}${disputeBtn}</div>
+      </div>
+
+      <div class="alert alert-warn mb-16">
+        <span>⚖️</span>
+        <div>This record is an onchain evidence claim — not a legal guarantee of authorship. The hash below shows this content existed at registration time. It does not prove who created it.</div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header"><span class="card-title">Work details</span></div>
+          <div class="detail-grid">
+            <dl class="detail-block"><dt>Title</dt><dd>${escHtml(ip.title)}</dd></dl>
+            <dl class="detail-block"><dt>Category</dt><dd>${cat}</dd></dl>
+            <dl class="detail-block"><dt>Declared creation</dt><dd>${creDate}</dd></dl>
+            <dl class="detail-block"><dt>Registered on-chain</dt><dd>${regDate}</dd></dl>
+            <dl class="detail-block"><dt>Rights holder</dt><dd style="font-family:monospace;font-size:12px;">${ip.rightsHolder}</dd></dl>
+            <dl class="detail-block"><dt>Active</dt><dd>${ip.isActive ? '✓ Yes' : '✗ No'}</dd></dl>
+          </div>
+          <dl class="detail-block mt-8"><dt>Description</dt><dd>${escHtml(ip.description) || '<em>None provided</em>'}</dd></dl>
+          ${ip.metadataUri ? `<dl class="detail-block mt-8"><dt>Metadata URI</dt><dd><a href="${ip.metadataUri}" target="_blank">${ip.metadataUri}</a></dd></dl>` : ''}
+        </div>
+
+        <div>
+          <div class="card mb-16">
+            <div class="card-header"><span class="card-title">Work hash (SHA-256)</span></div>
+            <div class="hash-box">${ip.workHash}</div>
+            <p class="text-soft text-sm mt-8">This hash was submitted by the registrant. Compute the SHA-256 of the original file to verify it matches — this confirms the file existed at the time of registration.</p>
+          </div>
+          <div class="card">
+            <div class="card-header"><span class="card-title">License statistics</span></div>
+            <div style="font-size:28px;font-family:'DM Serif Display',serif;color:var(--accent)">${licIds.length}</div>
+            <div class="text-soft text-sm">licenses issued</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mt-16">
+        <div class="card-header"><span class="card-title">Current license terms (version ${terms && terms.id > 0 ? terms.version : '—'})</span></div>
+        ${termsHtml}
+      </div>`;
+
+    showPage('ip-detail');
+  } catch (e) {
+    toast(parseError(e), 'err');
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+//  MARKETPLACE
+// ════════════════════════════════════════════════════════════════
+async function loadMarketplace() {
+  if (!walletAddress) return;
+  const grid = document.getElementById('marketplace-grid');
+  try {
+    const total = Number(await contract.getTotalIPs());
+    const cards = [];
+    for (let i = 1; i <= total; i++) {
+      const ip = await contract.getIPRecord(i);
+      if (!ip.isActive || ip.isFlagged || ip.activeTermsId == 0) continue;
+      const terms = await contract.getActiveTerms(i);
+      if (terms.id == 0) continue;
+      const feeBOT  = ethers.formatEther(terms.feeBOT);
+      const feeUSDT = (Number(terms.feeUSDT)/1e6).toFixed(2);
+      const dur     = terms.durationDays == 0 ? 'Perpetual' : terms.durationDays + ' days';
+      const cat  = CATEGORIES[Number(ip.category)];
+      const icon = CAT_ICONS[Number(ip.category)];
+      cards.push(`
+        <div class="license-card">
+          <div class="license-card-title">${icon} ${escHtml(ip.title)}</div>
+          <div class="text-soft text-sm" style="margin-bottom:12px;">${cat} · IP #${ip.id} · ${dur}</div>
+          <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
+            ${terms.feeBOT > 0 ? `<div class="license-card-fee">${feeBOT} <span>BOT</span></div>` : ''}
+            ${terms.feeUSDT > 0 ? `<div class="license-card-fee">${feeUSDT} <span>USDT</span></div>` : ''}
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">
+            ${terms.commercialAllowed ? '<span class="badge badge-green">Commercial ✓</span>' : '<span class="badge badge-grey">No commercial</span>'}
+            ${terms.derivativesAllowed ? '<span class="badge badge-green">Derivatives ✓</span>' : '<span class="badge badge-grey">No derivatives</span>'}
+            ${terms.attributionRequired ? '<span class="badge badge-amber">Attribution required</span>' : ''}
+          </div>
+          <div class="text-soft text-sm" style="margin-bottom:12px;">${escHtml(terms.permittedUses)}</div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-blue btn-sm" onclick="openPurchaseModal(${ip.id})">Purchase license</button>
+            <button class="btn btn-outline btn-sm" onclick="showIPDetail(${ip.id})">View details</button>
+          </div>
+        </div>`);
+    }
+    grid.innerHTML = cards.length ? cards.join('') : '<div class="empty-state"><div class="icon">🏪</div><p>No IP records currently available for licensing.</p></div>';
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+//  PURCHASE MODAL
+// ════════════════════════════════════════════════════════════════
+async function openPurchaseModal(ipId) {
+  if (!requireWallet()) return;
+  selectedIPForPurchase = ipId;
+  try {
+    const ip    = await contract.getIPRecord(ipId);
+    const terms = await contract.getActiveTerms(ipId);
+    const feeBOT  = ethers.formatEther(terms.feeBOT);
+    const feeUSDT = (Number(terms.feeUSDT)/1e6).toFixed(2);
+    const dur = terms.durationDays == 0 ? 'Perpetual' : terms.durationDays + ' days';
+    document.getElementById('purchase-modal-content').innerHTML = `
+      <div class="card" style="margin-bottom:12px;">
+        <div class="card-title">${escHtml(ip.title)}</div>
+        <div class="text-soft text-sm mt-8">${dur} · Terms v${terms.version}</div>
+        <div style="display:flex;gap:16px;margin-top:12px;">
+          ${terms.feeBOT > 0 ? `<div><div class="metric-label">BOT price</div><div style="font-size:20px;font-family:'DM Serif Display',serif;">${feeBOT}</div></div>` : ''}
+          ${terms.feeUSDT > 0 ? `<div><div class="metric-label">USDT price</div><div style="font-size:20px;font-family:'DM Serif Display',serif;">${feeUSDT}</div></div>` : ''}
+        </div>
+      </div>
+      <div class="alert alert-info">
+        <span>ℹ️</span>
+        <div>By purchasing, you agree to the license terms version ${terms.version} as recorded on-chain at the time of purchase. These terms are immutable for your license.</div>
+      </div>`;
+    document.getElementById('purchase-modal').classList.add('open');
+  } catch (e) {
+    toast(parseError(e), 'err');
+  }
+}
+
+async function purchaseBOT() {
+  if (!selectedIPForPurchase) return;
+  const note = document.getElementById('purchase-note').value;
+  try {
+    const terms = await contract.getActiveTerms(selectedIPForPurchase);
+    if (terms.feeBOT == 0) return toast('BOT not accepted for this IP.', 'err');
+    const tx = await contract.purchaseLicenseWithBOT(selectedIPForPurchase, note, { value: terms.feeBOT });
+    toast('Transaction sent…', 'info');
+    await tx.wait();
+    toast('License purchased!', 'ok');
+    closeModal('purchase-modal');
+  } catch (e) { toast(parseError(e), 'err'); }
+}
+
+async function purchaseUSDT() {
+  if (!selectedIPForPurchase) return;
+  const note = document.getElementById('purchase-note').value;
+  try {
+    const terms = await contract.getActiveTerms(selectedIPForPurchase);
+    if (terms.feeUSDT == 0) return toast('USDT not accepted for this IP.', 'err');
+    const allowance = await usdtContract.allowance(walletAddress, CONTRACT_ADDRESS);
+    if (allowance < terms.feeUSDT) {
+      const appTx = await usdtContract.approve(CONTRACT_ADDRESS, terms.feeUSDT);
+      toast('Approving USDT…', 'info');
+      await appTx.wait();
+    }
+    const tx = await contract.purchaseLicenseWithUSDT(selectedIPForPurchase, note);
+    toast('Transaction sent…', 'info');
+    await tx.wait();
+    toast('License purchased!', 'ok');
+    closeModal('purchase-modal');
+  } catch (e) { toast(parseError(e), 'err'); }
+}
+
+// ════════════════════════════════════════════════════════════════
+//  CREATOR DASHBOARD
+// ════════════════════════════════════════════════════════════════
+async function loadCreatorDashboard() {
+  if (!walletAddress) return;
+  try {
+    const ipIds = await contract.getHolderIPs(walletAddress);
+    document.getElementById('creator-ip-count').textContent = ipIds.length;
+
+    const revBOT  = await contract.pendingRevenueBOT(walletAddress);
+    const revUSDT = await contract.pendingRevenueUSDT(walletAddress);
+    document.getElementById('creator-rev-bot').textContent  = ethers.formatEther(revBOT) + ' BOT';
+    document.getElementById('creator-rev-usdt').textContent = (Number(revUSDT)/1e6).toFixed(2) + ' USDT';
+
+    // Load IP list
+    const ips = [];
+    for (const id of ipIds) {
+      const ip = await contract.getIPRecord(id);
+      ips.push(ip);
+    }
+
+    const sel1 = document.getElementById('terms-ip-select');
+    const sel2 = document.getElementById('transfer-ip-select');
+    sel1.innerHTML = '<option value="">— choose IP —</option>';
+    sel2.innerHTML = '<option value="">— choose IP —</option>';
+    ips.forEach(ip => {
+      const opt = `<option value="${ip.id}">${escHtml(ip.title)} (#${ip.id})</option>`;
+      sel1.insertAdjacentHTML('beforeend', opt);
+      sel2.insertAdjacentHTML('beforeend', opt);
+    });
+
+    const list = document.getElementById('creator-ip-list');
+    if (!ips.length) {
+      list.innerHTML = '<div class="empty-state"><div class="icon">🗂️</div><p>No IP records found. <a href="#" onclick="showPage(\'register\')">Register your first work.</a></p></div>';
+      return;
+    }
+
+    list.innerHTML = ips.map(ip => {
+      const cat  = CATEGORIES[Number(ip.category)];
+      const icon = CAT_ICONS[Number(ip.category)];
+      const date = new Date(Number(ip.registrationDate)*1000).toLocaleDateString();
+      return `
+        <div class="ip-card">
+          <div class="ip-card-title">${icon} ${escHtml(ip.title)}</div>
+          <div class="ip-card-meta">${cat} · Registered ${date}</div>
+          <div class="ip-card-hash">${ip.workHash}</div>
+          <div class="ip-card-footer">
+            <span class="badge badge-blue">${cat}</span>
+            ${ip.activeTermsId > 0 ? '<span class="badge badge-green">Terms set</span>' : '<span class="badge badge-amber">No terms</span>'}
+            ${ip.isFlagged ? '<span class="badge badge-red">Flagged</span>' : ''}
+          </div>
+          <div style="display:flex;gap:8px;margin-top:12px;">
+            <button class="btn btn-outline btn-sm" onclick="showIPDetail(${ip.id})">View</button>
+          </div>
+        </div>`;
+    }).join('');
+  } catch (e) { console.error(e); }
+}
+
+function creatorTab(id, btn) {
+  ['my-ip','publish-terms','transfer'].forEach(t => {
+    document.getElementById('creator-tab-' + t).style.display = 'none';
+  });
+  document.getElementById('creator-tab-' + id).style.display = 'block';
+  document.querySelectorAll('#page-creator .tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+async function publishTerms() {
+  if (!requireWallet()) return;
+  const ipId       = parseInt(document.getElementById('terms-ip-select').value);
+  const feeBOT     = document.getElementById('terms-fee-bot').value.trim() || '0';
+  const feeUSDT    = document.getElementById('terms-fee-usdt').value.trim() || '0';
+  const duration   = parseInt(document.getElementById('terms-duration').value) || 0;
+  const permitted  = document.getElementById('terms-permitted').value.trim();
+  const restrict   = document.getElementById('terms-restrictions').value.trim();
+  const commercial = document.getElementById('terms-commercial').checked;
+  const deriv      = document.getElementById('terms-derivatives').checked;
+  const attrib     = document.getElementById('terms-attribution').checked;
+
+  if (!ipId) return toast('Select an IP.', 'err');
+  if (feeBOT === '0' && feeUSDT === '0') return toast('Set at least one fee.', 'err');
+  try {
+    const tx = await contract.publishLicenseTerms(
+      ipId, permitted, restrict, commercial, deriv, attrib,
+      BigInt(feeBOT), BigInt(feeUSDT), duration
+    );
+    toast('Publishing terms…', 'info');
+    await tx.wait();
+    toast('Terms published.', 'ok');
+    loadCreatorDashboard();
+  } catch (e) { toast(parseError(e), 'err'); }
+}
+
+async function withdrawBOT() {
+  if (!requireWallet()) return;
+  try {
+    const tx = await contract.withdrawRevenueBOT();
+    toast('Withdrawing BOT…', 'info');
+    await tx.wait();
+    toast('BOT revenue withdrawn.', 'ok');
+    loadCreatorDashboard();
+  } catch (e) { toast(parseError(e), 'err'); }
+}
+
+async function withdrawUSDT() {
+  if (!requireWallet()) return;
+  try {
+    const tx = await contract.withdrawRevenueUSDT();
+    toast('Withdrawing USDT…', 'info');
+    await tx.wait();
+    toast('USDT revenue withdrawn.', 'ok');
+    loadCreatorDashboard();
+  } catch (e) { toast(parseError(e), 'err'); }
+}
+
+async function proposeTransfer() {
+  if (!requireWallet()) return;
+  const ipId = parseInt(document.getElementById('transfer-ip-select').value);
+  const to   = document.getElementById('transfer-to').value.trim();
+  if (!ipId) return toast('Select an IP.', 'err');
+  if (!ethers.isAddress(to)) return toast('Enter a valid wallet address.', 'err');
+  try {
+    const tx = await contract.proposeOwnershipTransfer(ipId, to);
+    toast('Proposing transfer…', 'info');
+    await tx.wait();
+    toast('Transfer proposed. The recipient must accept.', 'ok');
+  } catch (e) { toast(parseError(e), 'err'); }
+}
+
+// ════════════════════════════════════════════════════════════════
+//  LICENSEE DASHBOARD
+// ════════════════════════════════════════════════════════════════
+async function loadLicenseeDashboard() {
+  if (!walletAddress) return;
+  try {
+    const licIds = await contract.getLicenseeLicenses(walletAddress);
+    const list = document.getElementById('licensee-list');
+    if (!licIds.length) {
+      list.innerHTML = '<div class="empty-state"><div class="icon">📋</div><p>No licenses found. <a href="#" onclick="showPage(\'marketplace\')">Browse the marketplace.</a></p></div>';
+      return;
+    }
+
+    const STATUS = ['Active','Expired','Revoked'];
+    const badgeClass = ['badge-green','badge-grey','badge-red'];
+    const cards = [];
+    for (const id of licIds) {
+      const lic   = await contract.getLicense(id);
+      const isAct = await contract.isLicenseActive(id);
+      const ip    = await contract.getIPRecord(lic.ipId);
+      const exp   = lic.expiresAt == 0 ? 'Perpetual' : new Date(Number(lic.expiresAt)*1000).toLocaleDateString();
+      const icon  = CAT_ICONS[Number(ip.category)];
+      const stat  = isAct ? 0 : (lic.status == 0 ? 1 : Number(lic.status));
+      cards.push(`
+        <div class="license-card">
+          <div class="license-card-title">${icon} ${escHtml(ip.title)}</div>
+          <div class="text-soft text-sm" style="margin-bottom:10px;">License #${lic.id} · IP #${lic.ipId}</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+            <span class="badge ${badgeClass[stat]}">${isAct ? 'Active' : STATUS[Number(lic.status)]}</span>
+            <span class="badge badge-grey">Expires: ${exp}</span>
+            <span class="badge badge-grey">${lic.payToken == 0 ? 'Paid in BOT' : 'Paid in USDT'}</span>
+          </div>
+          <div class="text-soft text-sm" style="margin-bottom:12px;">Issued: ${new Date(Number(lic.issuedAt)*1000).toLocaleDateString()}</div>
+          <button class="btn btn-outline btn-sm" onclick="showIPDetail(${lic.ipId})">View IP</button>
+        </div>`);
+    }
+    list.innerHTML = cards.join('');
+  } catch (e) { console.error(e); }
+}
+
+function licenseeTab(id, btn) {
+  ['my-licenses','verify','accept-transfer'].forEach(t => {
+    document.getElementById('licensee-tab-' + t).style.display = 'none';
+  });
+  document.getElementById('licensee-tab-' + id).style.display = 'block';
+  document.querySelectorAll('#page-licensee .tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+async function verifyLicense() {
+  if (!requireWallet()) return;
+  const id = parseInt(document.getElementById('verify-license-id').value);
+  if (!id) return toast('Enter a license ID.', 'err');
+  const result = document.getElementById('verify-result');
+  try {
+    const isActive = await contract.isLicenseActive(id);
+    const lic = await contract.getLicense(id);
+    const ip  = await contract.getIPRecord(lic.ipId);
+    const exp = lic.expiresAt == 0 ? 'Perpetual' : new Date(Number(lic.expiresAt)*1000).toLocaleString();
+    result.innerHTML = `
+      <div class="alert ${isActive ? 'alert-ok' : 'alert-err'}">
+        <span>${isActive ? '✓' : '✗'}</span>
+        <div>
+          <strong>License #${id} is ${isActive ? 'ACTIVE' : 'NOT active'}.</strong><br/>
+          IP: ${escHtml(ip.title)} (#${lic.ipId})<br/>
+          Licensee: <code>${lic.licensee}</code><br/>
+          Expires: ${exp}
+        </div>
+      </div>`;
+  } catch (e) {
+    result.innerHTML = `<div class="alert alert-err"><span>✗</span><div>${parseError(e)}</div></div>`;
+  }
+}
+
+async function acceptTransfer() {
+  if (!requireWallet()) return;
+  const ipId = parseInt(document.getElementById('accept-transfer-id').value);
+  if (!ipId) return toast('Enter an IP ID.', 'err');
+  try {
+    const tx = await contract.acceptOwnershipTransfer(ipId);
+    toast('Accepting transfer…', 'info');
+    await tx.wait();
+    toast('Ownership transferred to your wallet.', 'ok');
+  } catch (e) { toast(parseError(e), 'err'); }
+}
+
+// ════════════════════════════════════════════════════════════════
+//  ADMIN DASHBOARD
+// ════════════════════════════════════════════════════════════════
+async function loadAdminDashboard() {
+  if (!walletAddress) return;
+  try {
+    document.getElementById('admin-total-ip').textContent  = Number(await contract.getTotalIPs());
+    document.getElementById('admin-total-lic').textContent = Number(await contract.getTotalLicenses());
+    const fee = Number(await contract.platformFeeBps());
+    document.getElementById('admin-fee-display').textContent = fee + ' bps (' + (fee/100) + '%)';
+    document.getElementById('admin-platform-fee').value = fee;
+    const regFee = await contract.registrationFeeWei();
+    document.getElementById('admin-reg-fee').value = regFee.toString();
+  } catch (e) { console.error(e); }
+}
+
+function adminTab(id, btn) {
+  ['platform','flag','disputes','withdraw'].forEach(t => {
+    document.getElementById('admin-tab-' + t).style.display = 'none';
+  });
+  document.getElementById('admin-tab-' + id).style.display = 'block';
+  document.querySelectorAll('#page-admin .tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+async function setRegFee() {
+  if (!requireWallet()) return;
+  const fee = document.getElementById('admin-reg-fee').value.trim();
+  try {
+    const tx = await contract.setRegistrationFee(BigInt(fee));
+    toast('Updating registration fee…', 'info');
+    await tx.wait();
+    toast('Registration fee updated.', 'ok');
+  } catch (e) { toast(parseError(e), 'err'); }
+}
+
+async function setPlatformFee() {
+  if (!requireWallet()) return;
+  const bps = parseInt(document.getElementById('admin-platform-fee').value);
+  if (bps > 1000) return toast('Max 1000 bps (10%).', 'err');
+  try {
+    const tx = await contract.setPlatformFee(bps);
+    toast('Updating platform fee…', 'info');
+    await tx.wait();
+    toast('Platform fee updated.', 'ok');
+    loadAdminDashboard();
+  } catch (e) { toast(parseError(e), 'err'); }
+}
+
+async function adminFlag(flag) {
+  if (!requireWallet()) return;
+  const id = parseInt(document.getElementById('admin-flag-id').value);
+  if (!id) return toast('Enter an IP ID.', 'err');
+  try {
+    const tx = await contract.flagIP(id, flag);
+    toast('Flagging…', 'info');
+    await tx.wait();
+    toast(flag ? 'IP flagged.' : 'Flag removed.', 'ok');
+  } catch (e) { toast(parseError(e), 'err'); }
+}
+
+async function resolveDispute() {
+  if (!requireWallet()) return;
+  const id  = parseInt(document.getElementById('admin-dispute-id').value);
+  const out = parseInt(document.getElementById('admin-dispute-outcome').value);
+  const res = document.getElementById('admin-dispute-resolution').value.trim();
+  if (!id) return toast('Enter a dispute ID.', 'err');
+  if (!res) return toast('Resolution notes required.', 'err');
+  try {
+    const tx = await contract.resolveDispute(id, out, res);
+    toast('Resolving…', 'info');
+    await tx.wait();
+    toast('Dispute resolved.', 'ok');
+  } catch (e) { toast(parseError(e), 'err'); }
+}
+
+async function adminWithdraw() {
+  if (!requireWallet()) return;
+  const token  = document.getElementById('admin-wd-token').value.trim();
+  const amount = document.getElementById('admin-wd-amount').value.trim();
+  const tokenAddr = token === '' || token.toLowerCase().includes('0x000000000000000000000000000000000000000')
+    ? ethers.ZeroAddress : token;
+  try {
+    const tx = await contract.withdrawAdminFees(tokenAddr, BigInt(amount));
+    toast('Withdrawing…', 'info');
+    await tx.wait();
+    toast('Fees withdrawn.', 'ok');
+  } catch (e) { toast(parseError(e), 'err'); }
+}
+
+// ════════════════════════════════════════════════════════════════
+//  DISPUTE
+// ════════════════════════════════════════════════════════════════
+function openDisputeModal(ipId) {
+  if (!requireWallet()) return;
+  selectedIPForDispute = ipId;
+  document.getElementById('dispute-modal').classList.add('open');
+}
+
+async function submitDispute() {
+  if (!requireWallet() || !selectedIPForDispute) return;
+  const reason = document.getElementById('dispute-reason').value.trim();
+  if (!reason) return toast('Provide a reason.', 'err');
+  try {
+    const tx = await contract.reportDispute(selectedIPForDispute, reason);
+    toast('Submitting dispute…', 'info');
+    await tx.wait();
+    toast('Dispute reported.', 'ok');
+    closeModal('dispute-modal');
+  } catch (e) { toast(parseError(e), 'err'); }
+}
+
+// ════════════════════════════════════════════════════════════════
+//  MODALS / TOASTS / UTILS
+// ════════════════════════════════════════════════════════════════
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+}
+
+function toast(msg, type = 'info') {
+  const area = document.getElementById('toast-area');
+  const el   = document.createElement('div');
+  el.className = 'toast toast-' + type;
+  el.textContent = msg;
+  area.appendChild(el);
+  setTimeout(() => el.remove(), 4500);
+}
+
+function escHtml(str) {
+  return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function parseError(e) {
+  if (e.reason) return e.reason;
+  if (e.data?.message) return e.data.message;
+  if (e.message) return e.message.split('(')[0].trim();
+  return 'Unknown error';
+}
+
+// ════════════════════════════════════════════════════════════════
+//  INIT
+// ════════════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  // If MetaMask is already connected, auto-detect
+  if (window.ethereum?.selectedAddress) {
+    connectWallet();
+  }
+});
+</script>
+</body>
+</html>
